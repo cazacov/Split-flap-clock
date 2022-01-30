@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "OmegaDriver",
+			"path": "OmegaDriver"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"xstring": "cpp"
+		}
+	}
+}

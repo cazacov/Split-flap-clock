@@ -48,3 +48,11 @@
 ![Side](./_img/board-front.jpg)
 
 ![Side](./_img/board-back.jpg)
+
+## Other Web Resources 
+
+https://github.com/c3dprk/split-flap
+
+https://fallblatt.blogspot.com/
+
+https://www.thingiverse.com/thing:2369832
