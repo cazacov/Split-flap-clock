@@ -2,7 +2,7 @@
 
 ![Split-Flap Clock](./_img/split-flaps.jpg)
 
-## Connector Pinot
+## Connector Pinout
 
 | Pin | Signal  |
 |-----|-------- |

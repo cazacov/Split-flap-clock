@@ -2,11 +2,17 @@
 
 ## Test board connections
 
-GPIO16 -> ULN2803 -> Start minutes
-GPIO17 -> ULN2803 -> ADC minutes
-GPIO5 -> ULN2803 -> Start hours
-GPIO18 -> ULN2803 -> ADC hours
-GPIO19 -> ULN2803 -> ADL (common for hours and minutes)
+GPIO 16 -> ULN2803 -> Start
+GPIO 17 -> ULN2803 -> ADC hours
+GPIO 5  -> ULN2803 -> ADC minutes
+GPIO 18 -> ULN2803 -> ADL
+ 
+GPIO 32 -> DATA 0
+GPIO 33 -> DATA 1
+GPIO 25 -> DATA 2
+GPIO 26 -> DATA 3
+GPIO 27 -> DATA 4
+GPIO 14 -> DATA 5
 
 ---
 All trademarks are the property of their respective owners
