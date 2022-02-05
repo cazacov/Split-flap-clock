@@ -36,18 +36,24 @@
 |P2   | ADC          |
 |P3   | 0V DC and AC |
 
+![Split-Flap Clock](./_img/connector.jpg)
+
+## Prototype with ESP32
+
+![Prototype](./_img/prototype.jpg)
+
 ## More photos
 ![Side](./_img/side.jpg)
 
-![Side](./_img/front.jpg)
+![Front](./_img/front.jpg)
 
-![Side](./_img/motor.jpg)
+![Motor](./_img/motor.jpg)
 
-![Side](./_img/encoder.jpg)
+![Encoder](./_img/encoder.jpg)
 
-![Side](./_img/board-front.jpg)
+![Board](./_img/board-front.jpg)
 
-![Side](./_img/board-back.jpg)
+![Board](./_img/board-back.jpg)
 
 ## Other Web Resources 
 
