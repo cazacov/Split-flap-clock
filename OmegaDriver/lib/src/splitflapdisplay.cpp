@@ -1,5 +1,7 @@
 #include "splitflapdisplay.h"
 
+volatile bool SplitFlapDisplay_lock = false;
+
 SplitFlapDisplay::SplitFlapDisplay(DisplayType display_type, uint8_t start_pin, uint8_t adl_pin, uint8_t adc_pin,
   uint8_t data0_pin, uint8_t data1_pin, uint8_t data2_pin, uint8_t data3_pin, uint8_t data4_pin, uint8_t data5_pin) :
     display_type_(display_type),
@@ -29,13 +31,14 @@ SplitFlapDisplay::SplitFlapDisplay(DisplayType display_type, uint8_t start_pin, 
   digitalWrite(adc_pin_, LOW);
 
   current_pos_ = -1;
+  target_flap_ = -1;
+  is_counting_ = false;
 
   Serial.print("Initialized");
 }
 
 uint8_t SplitFlapDisplay::ReadEncoder() {
   uint8_t input = 0;
-
   input += (digitalRead(data0_pin_) == LOW) ? 1 << 0 : 0;
   input += (digitalRead(data1_pin_) == LOW) ? 1 << 1 : 0;
   input += (digitalRead(data2_pin_) == LOW) ? 1 << 2 : 0;
@@ -46,27 +49,27 @@ uint8_t SplitFlapDisplay::ReadEncoder() {
 }
 
 uint8_t SplitFlapDisplay::read() {
-  digitalWrite(adl_pin_, HIGH);
-  digitalWrite(adc_pin_, HIGH);
-  delayMicroseconds(35);
+  Lock();
+  EnableModule();
   uint8_t input = ReadEncoder();
-  digitalWrite(adl_pin_, LOW);
-  digitalWrite(adc_pin_, LOW);
+  DisableModule();
+  Unlock();
   return input;
 }
 
-int8_t SplitFlapDisplay::init() {
-  
+int8_t SplitFlapDisplay::init(StensTimer* stens_timer) {
+  stens_timer_ = stens_timer;
   uint8_t encoder = read();
   if (encoder > 0) {
-    current_pos_ = encoder;
+    current_pos_ = EncoderToPos(encoder);
   }
   else {
     current_pos_ = -1;
   }
+  return current_pos_;
 }
 
-int8_t SplitFlapDisplay::EncoderToIndex(uint8_t encoder_value) {
+int8_t SplitFlapDisplay::EncoderToPos(uint8_t encoder_value) {
   
   switch (display_type_) {
     case k40Flaps:
@@ -119,62 +122,107 @@ int8_t SplitFlapDisplay::EncoderToIndex(uint8_t encoder_value) {
 
 void SplitFlapDisplay::MotorStart() {
 //  Serial.println("start motor");
-  digitalWrite(adl_pin_, HIGH);
-  digitalWrite(adc_pin_, HIGH);
+  Lock();
+  EnableModule();
   digitalWrite(start_pin_, HIGH);
   delayMicroseconds(35);
-  digitalWrite(adl_pin_, LOW);
-  digitalWrite(adc_pin_, LOW);
+  DisableModule();
+  delayMicroseconds(35);
+  digitalWrite(start_pin_, LOW);
+  Unlock();
 }
 
 void SplitFlapDisplay::MotorStop() {
-//  Serial.println("stop motor");
-  digitalWrite(adl_pin_, HIGH);
-  digitalWrite(adc_pin_, HIGH);
-  digitalWrite(start_pin_, LOW);
+  Lock();
+  EnableModule();
   delayMicroseconds(35);
-  digitalWrite(adl_pin_, LOW);
-  digitalWrite(adc_pin_, LOW);
+  DisableModule();
+  Unlock();
 }
 
 void SplitFlapDisplay::gotoFlap(uint8_t flap_index) {
 
+  if (is_counting_) {
+    Serial.println("Is already counting. Skip gotoFlap");
+    return;
+  }
+
   Serial.print("GOTO ");
   Serial.println(flap_index);
 
-  if (current_pos_ > 0) {
     Serial.print("Current pos: ");
     Serial.println(current_pos_);
     Serial.print("Target pos: ");
     Serial.println(flap_index);
-    int steps = flap_index - current_pos_;
+
+  if (current_pos_ == flap_index) {
+    Serial.println("nothing to do");
+    return;  
+  }
+
+  int steps = 0;
+  if (current_pos_ >= 0) {
+    steps = flap_index - current_pos_;
     if (steps < 0) {
       steps += 40;
     }
-    Serial.print("Steps: ");
-    Serial.println(steps);
-
-    int del = 0;
-    if (steps > 0) {
-      del = 4000L * steps / 30 - 20;
-    }
-    Serial.print("Delay: ");
-    Serial.println(del);
-    MotorStart();
-    delay(del);
-    MotorStop();
   }
-  do {
-    uint8_t encoder = read();
-    if (encoder == flap_index) {
-      current_pos_ = encoder;  
-      Serial.println("DONE! ");
-      Serial.println(encoder);
-      break;
-    } 
+  Serial.print("Steps: ");
+  Serial.println(steps);
+
+  long del = 20;
+  if (steps > 0) {
+    del = 4000L * steps / 30 - 20;
+  }
+  Serial.print("Delay: ");
+  Serial.println(del);
+
+  target_flap_ = flap_index;
+  is_counting_ = true;
+
+  MotorStart();
+  stens_timer_->setTimer(this, 1, del);
+  Serial.print("Set timer ");
+  Serial.println(del);
+}
+
+void SplitFlapDisplay::timerCallback(Timer* timer) {
+  Serial.print("callback");
+  MotorStop();
+  uint8_t encoder = read();
+  if (encoder == target_flap_) {
+    current_pos_ = encoder;
+    target_flap_ = -1;  
+    is_counting_ = false;
+    Serial.println("DONE! ");
     Serial.println(encoder);
-    MotorStart();
-    delay(20);
-    MotorStop();
-  } while (true);
+    return;
+  }
+  Serial.print("not there yet: ");
+  Serial.println(encoder);
+  MotorStart();
+  stens_timer_->setTimer(this, 1, 20);
+}
+
+void SplitFlapDisplay::EnableModule() {
+  digitalWrite(adl_pin_, HIGH);
+  digitalWrite(adc_pin_, HIGH);
+  delayMicroseconds(35);
+}
+
+void SplitFlapDisplay::DisableModule() {
+  digitalWrite(adl_pin_, LOW);
+  digitalWrite(adc_pin_, LOW);
+}
+
+void SplitFlapDisplay::Lock() {
+  while (SplitFlapDisplay_lock) {
+    Serial.println("---");
+    delay(10);
+  }
+  SplitFlapDisplay_lock = true;
+}
+
+void SplitFlapDisplay::Unlock() {
+  SplitFlapDisplay_lock = false;
 }
