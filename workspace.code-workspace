@@ -3,11 +3,16 @@
 		{
 			"name": "OmegaDriver",
 			"path": "OmegaDriver"
+		},
+		{
+			"name": "TimerTest",
+			"path": "TimerTest"
 		}
 	],
 	"settings": {
 		"files.associations": {
-			"xstring": "cpp"
+			"xstring": "cpp",
+			"*.tcc": "cpp"
 		}
 	}
 }

@@ -14,32 +14,27 @@ const uint8_t PIN_DATA3 = 26;
 const uint8_t PIN_DATA4 = 27;
 const uint8_t PIN_DATA5 = 14;
 
-StensTimer* stensTimer;
-
-
-
-SplitFlapDisplay hours(k40Flaps, PIN_START, PIN_ADL, PIN_HOURS_ADC,
-  PIN_DATA0,PIN_DATA1,PIN_DATA2,PIN_DATA3,PIN_DATA4,PIN_DATA5);
+SplitFlapDisplay* hours;
+SplitFlapDisplay* minutes;
 
 void setup() {
   Serial.begin(115200);
-  stensTimer = StensTimer::getInstance();
-  hours.init(stensTimer);
+  SplitFlapDisplay::init(PIN_START, PIN_ADL,PIN_DATA0,PIN_DATA1,PIN_DATA2,PIN_DATA3,PIN_DATA4,PIN_DATA5);
+  hours = new SplitFlapDisplay(k40Flaps, PIN_HOURS_ADC);
   delay(5000);
 }
 
 int i = 1;
 
 void loop() {
-  stensTimer->run();
-  if (hours.isCounting()) {
+  if (hours->isCounting()) {
     Serial.println("Waiting for hours counter");
-    while (hours.isCounting()) {
+    while (hours->isCounting()) {
       delay(200);
     }
   }
   delay(3000);
-  hours.gotoFlap(i);
+  hours->gotoFlap(i);
   i++;
   if (i == 25) {
     i = 1;    

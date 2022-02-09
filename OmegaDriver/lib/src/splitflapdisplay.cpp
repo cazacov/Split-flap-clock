@@ -1,39 +1,31 @@
 #include "splitflapdisplay.h"
 
-volatile bool SplitFlapDisplay_lock = false;
+DisplayDescriptor SplitFlapDisplay::displays_[16];
+uint8_t SplitFlapDisplay::display_count_ = 0;
+uint8_t SplitFlapDisplay::start_pin_ = 0;
+uint8_t SplitFlapDisplay::adl_pin_ = 0;
+uint8_t SplitFlapDisplay::data0_pin_ = 0;
+uint8_t SplitFlapDisplay::data1_pin_ = 0;
+uint8_t SplitFlapDisplay::data2_pin_ = 0;
+uint8_t SplitFlapDisplay::data3_pin_ = 0;
+uint8_t SplitFlapDisplay::data4_pin_ = 0;
+uint8_t SplitFlapDisplay::data5_pin_ = 0;
 
-SplitFlapDisplay::SplitFlapDisplay(DisplayType display_type, uint8_t start_pin, uint8_t adl_pin, uint8_t adc_pin,
-  uint8_t data0_pin, uint8_t data1_pin, uint8_t data2_pin, uint8_t data3_pin, uint8_t data4_pin, uint8_t data5_pin) :
+SplitFlapDisplay::SplitFlapDisplay(DisplayType display_type, uint8_t adc_pin) :
     display_type_(display_type),
-    start_pin_(start_pin),
-    adl_pin_(adl_pin), 
-    adc_pin_(adc_pin),
-    data0_pin_(data0_pin),
-    data1_pin_(data1_pin),
-    data2_pin_(data2_pin),
-    data3_pin_(data3_pin),
-    data4_pin_(data4_pin),
-    data5_pin_(data5_pin)
+    adc_pin_(adc_pin)
 {
-  pinMode(start_pin_, OUTPUT);
-  pinMode(adl_pin_, OUTPUT);
   pinMode(adc_pin_, OUTPUT);
-
-  pinMode(data0_pin_, INPUT_PULLUP);
-  pinMode(data1_pin_, INPUT_PULLUP);
-  pinMode(data2_pin_, INPUT_PULLUP);
-  pinMode(data3_pin_, INPUT_PULLUP);
-  pinMode(data4_pin_, INPUT_PULLUP);
-  pinMode(data5_pin_, INPUT_PULLUP);
-
-  digitalWrite(start_pin_, LOW);
-  digitalWrite(adl_pin_, LOW);
   digitalWrite(adc_pin_, LOW);
 
-  current_pos_ = -1;
-  target_flap_ = -1;
-  is_counting_ = false;
-
+  displays_[display_count_].adc_pin = adc_pin;
+  displays_[display_count_].is_counting = false;
+  displays_[display_count_].target_millis = 0;
+  displays_[display_count_].target_encoder = 0;
+  displays_[display_count_].must_be_started = false;
+  displays_[display_count_].current_encoder = 0;
+  display_index_ = display_count_;
+  display_count_++;
   Serial.print("Initialized");
 }
 
@@ -48,25 +40,36 @@ uint8_t SplitFlapDisplay::ReadEncoder() {
   return input;
 }
 
-uint8_t SplitFlapDisplay::read() {
-  Lock();
-  EnableModule();
+uint8_t SplitFlapDisplay::read(uint8_t adc_pin) {
+  EnableModule(adc_pin);
   uint8_t input = ReadEncoder();
-  DisableModule();
-  Unlock();
+  DisableModule(adc_pin);
   return input;
 }
 
-int8_t SplitFlapDisplay::init(StensTimer* stens_timer) {
-  stens_timer_ = stens_timer;
-  uint8_t encoder = read();
-  if (encoder > 0) {
-    current_pos_ = EncoderToPos(encoder);
-  }
-  else {
-    current_pos_ = -1;
-  }
-  return current_pos_;
+void SplitFlapDisplay::init(uint8_t start_pin, uint8_t adl_pin, uint8_t data0_pin, uint8_t data1_pin, uint8_t data2_pin, uint8_t data3_pin, uint8_t data4_pin, uint8_t data5_pin) {
+  start_pin_ = start_pin;
+  adl_pin_ = adl_pin;
+  data0_pin_ = data0_pin;
+  data1_pin_ = data1_pin;
+  data2_pin_ = data2_pin;
+  data3_pin_ = data3_pin;
+  data4_pin_ = data4_pin;
+  data5_pin_ = data5_pin;
+  display_count_ = 0;
+
+  pinMode(start_pin_, OUTPUT);
+  pinMode(adl_pin_, OUTPUT);
+    
+  pinMode(data0_pin_, INPUT_PULLUP);
+  pinMode(data1_pin_, INPUT_PULLUP);
+  pinMode(data2_pin_, INPUT_PULLUP);
+  pinMode(data3_pin_, INPUT_PULLUP);
+  pinMode(data4_pin_, INPUT_PULLUP);
+  pinMode(data5_pin_, INPUT_PULLUP);
+
+  digitalWrite(start_pin_, LOW);
+  digitalWrite(adl_pin_, LOW);
 }
 
 int8_t SplitFlapDisplay::EncoderToPos(uint8_t encoder_value) {
@@ -120,40 +123,22 @@ int8_t SplitFlapDisplay::EncoderToPos(uint8_t encoder_value) {
   }
 }
 
-void SplitFlapDisplay::MotorStart() {
-//  Serial.println("start motor");
-  Lock();
-  EnableModule();
-  digitalWrite(start_pin_, HIGH);
-  delayMicroseconds(35);
-  DisableModule();
-  delayMicroseconds(35);
-  digitalWrite(start_pin_, LOW);
-  Unlock();
-}
-
-void SplitFlapDisplay::MotorStop() {
-  Lock();
-  EnableModule();
-  delayMicroseconds(35);
-  DisableModule();
-  Unlock();
-}
-
 void SplitFlapDisplay::gotoFlap(uint8_t flap_index) {
 
-  if (is_counting_) {
+  if (isCounting()) {
     Serial.println("Is already counting. Skip gotoFlap");
     return;
   }
 
+  uint8_t current_encoder = displays_[display_index_].current_encoder;
+
   Serial.print("GOTO ");
   Serial.println(flap_index);
 
-    Serial.print("Current pos: ");
-    Serial.println(current_pos_);
-    Serial.print("Target pos: ");
-    Serial.println(flap_index);
+  Serial.print("Current pos: ");
+  Serial.println(current_encoder);
+  Serial.print("Target pos: ");
+  Serial.println(flap_index);
 
   if (current_pos_ == flap_index) {
     Serial.println("nothing to do");
@@ -161,10 +146,14 @@ void SplitFlapDisplay::gotoFlap(uint8_t flap_index) {
   }
 
   int steps = 0;
-  if (current_pos_ >= 0) {
-    steps = flap_index - current_pos_;
-    if (steps < 0) {
-      steps += 40;
+
+  if (current_encoder) {
+    int8_t current_pos = EncoderToPos(current_encoder);
+    if (current_pos >= 0) {
+      steps = flap_index - current_pos;
+      if (steps < 0) {
+        steps += 40;
+      }
     }
   }
   Serial.print("Steps: ");
@@ -177,52 +166,37 @@ void SplitFlapDisplay::gotoFlap(uint8_t flap_index) {
   Serial.print("Delay: ");
   Serial.println(del);
 
-  target_flap_ = flap_index;
-  is_counting_ = true;
-
-  MotorStart();
-  stens_timer_->setTimer(this, 1, del);
   Serial.print("Set timer ");
   Serial.println(del);
+
+  displays_[display_index_].target_encoder = flap_index;
+  displays_[display_index_].must_be_started = true;
+  displays_[display_index_].target_millis = millis() + del;
 }
 
-void SplitFlapDisplay::timerCallback(Timer* timer) {
-  Serial.print("callback");
-  MotorStop();
-  uint8_t encoder = read();
-  if (encoder == target_flap_) {
-    current_pos_ = encoder;
-    target_flap_ = -1;  
-    is_counting_ = false;
-    Serial.println("DONE! ");
-    Serial.println(encoder);
-    return;
-  }
-  Serial.print("not there yet: ");
-  Serial.println(encoder);
-  MotorStart();
-  stens_timer_->setTimer(this, 1, 20);
-}
-
-void SplitFlapDisplay::EnableModule() {
+void SplitFlapDisplay::EnableModule(uint8_t adc_pin) {
   digitalWrite(adl_pin_, HIGH);
-  digitalWrite(adc_pin_, HIGH);
+  digitalWrite(adc_pin, HIGH);
   delayMicroseconds(35);
 }
 
-void SplitFlapDisplay::DisableModule() {
+void SplitFlapDisplay::DisableModule(uint8_t adc_pin) {
   digitalWrite(adl_pin_, LOW);
-  digitalWrite(adc_pin_, LOW);
+  digitalWrite(adc_pin, LOW);
 }
 
-void SplitFlapDisplay::Lock() {
-  while (SplitFlapDisplay_lock) {
-    Serial.println("---");
-    delay(10);
-  }
-  SplitFlapDisplay_lock = true;
+void SplitFlapDisplay::MotorStart(uint8_t adc_pin) {
+  EnableModule(adc_pin);
+  digitalWrite(start_pin_, HIGH);
+  delayMicroseconds(35);
+  DisableModule(adc_pin);
+  delayMicroseconds(35);
+  digitalWrite(start_pin_, LOW);
 }
 
-void SplitFlapDisplay::Unlock() {
-  SplitFlapDisplay_lock = false;
+void SplitFlapDisplay::MotorStop(uint8_t adc_pin) {
+  EnableModule(adc_pin);
+  delayMicroseconds(35);
+  DisableModule(adc_pin);
 }
+
