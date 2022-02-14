@@ -32,12 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "ESP32TimerInterrupt.h"
 
-#include <MyClass.h>
-#include <StensTimer.h>
-StensTimer* stensTimer;
-
-/* Define some custom Action code */
-#define SHOW_NAME_ACTION 1
 
 #if USING_ESP32_S2_TIMER_INTERRUPT
   void IRAM_ATTR TimerHandler0(void * timerNo)
@@ -52,12 +46,7 @@ StensTimer* stensTimer;
   /////////////////////////////////////////////////////////
 #endif
 
-#if (TIMER_INTERRUPT_DEBUG > 0)
   Serial.print("ITimer0: millis() = "); Serial.println(millis());
-#endif
-  if (stensTimer) {
-    stensTimer->run();
-  }
 
 #if USING_ESP32_S2_TIMER_INTERRUPT
   /////////////////////////////////////////////////////////
@@ -67,7 +56,7 @@ StensTimer* stensTimer;
 #endif
 }
 
-#define TIMER0_INTERVAL_MS        20
+#define TIMER0_INTERVAL_MS        500
 
 // Init ESP32 timer 0
 ESP32Timer ITimer0(0);
@@ -87,9 +76,6 @@ void setup() {
   Serial.println(ESP32_TIMER_INTERRUPT_VERSION);
 #endif
 
-  /* Save instance of StensTimer to the stensTimer variable */
-  stensTimer = StensTimer::getInstance();
-
   Serial.print(F("CPU Frequency = ")); Serial.print(F_CPU / 1000000); Serial.println(F(" MHz"));
 
   // Using ESP32  => 80 / 160 / 240MHz CPU clock ,
@@ -105,21 +91,10 @@ void setup() {
     Serial.println(F("Can't set ITimer0. Select another freq. or timer"));  
 
 
-  /* Example of two different instances of a class and set their names */
-  MyClass* myClassOne = new MyClass(stensTimer);
-  MyClass* myClassTwo = new MyClass(stensTimer);
-  myClassOne->setName("One");
-  myClassTwo->setName("Two");
-
-  /* Set timers for myClassOne and myClassTwo to show their name */
-  stensTimer->setTimer(myClassOne, SHOW_NAME_ACTION, 1000);
-  stensTimer->setTimer(myClassTwo, SHOW_NAME_ACTION, 2000);
-
   Serial.println("Setup completed...");
 
 }
 
 void loop() {
-  /* Let StensTimer do it's magic every time loop() is executed */
   
 }
