@@ -3,16 +3,19 @@
 		{
 			"name": "OmegaDriver",
 			"path": "OmegaDriver"
-		},
-		{
-			"name": "TimerTest",
-			"path": "TimerTest"
 		}
 	],
 	"settings": {
 		"files.associations": {
 			"xstring": "cpp",
-			"*.tcc": "cpp"
+			"*.tcc": "cpp",
+			"array": "cpp",
+			"deque": "cpp",
+			"string": "cpp",
+			"unordered_map": "cpp",
+			"unordered_set": "cpp",
+			"vector": "cpp",
+			"initializer_list": "cpp"
 		}
 	}
 }
