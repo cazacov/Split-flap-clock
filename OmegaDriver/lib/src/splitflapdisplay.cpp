@@ -1,5 +1,7 @@
 #include "splitflapdisplay.h"
 
+ESP32Timer SplitFlapDisplay::itimer_(0);
+
 DisplayDescriptor SplitFlapDisplay::displays_[16];
 uint8_t SplitFlapDisplay::display_count_ = 0;
 uint8_t SplitFlapDisplay::start_pin_ = 0;
@@ -11,12 +13,14 @@ uint8_t SplitFlapDisplay::data3_pin_ = 0;
 uint8_t SplitFlapDisplay::data4_pin_ = 0;
 uint8_t SplitFlapDisplay::data5_pin_ = 0;
 
+
+
 SplitFlapDisplay::SplitFlapDisplay(DisplayType display_type, uint8_t adc_pin) :
     display_type_(display_type),
     adc_pin_(adc_pin)
 {
   pinMode(adc_pin_, OUTPUT);
-  digitalWrite(adc_pin_, LOW);
+  MotorStop(adc_pin);
 
   displays_[display_count_].adc_pin = adc_pin;
   displays_[display_count_].is_counting = false;
@@ -58,9 +62,6 @@ void SplitFlapDisplay::init(uint8_t start_pin, uint8_t adl_pin, uint8_t data0_pi
   data5_pin_ = data5_pin;
   display_count_ = 0;
 
-  pinMode(start_pin_, OUTPUT);
-  pinMode(adl_pin_, OUTPUT);
-    
   pinMode(data0_pin_, INPUT_PULLUP);
   pinMode(data1_pin_, INPUT_PULLUP);
   pinMode(data2_pin_, INPUT_PULLUP);
@@ -68,8 +69,26 @@ void SplitFlapDisplay::init(uint8_t start_pin, uint8_t adl_pin, uint8_t data0_pi
   pinMode(data4_pin_, INPUT_PULLUP);
   pinMode(data5_pin_, INPUT_PULLUP);
 
+  pinMode(start_pin_, OUTPUT);
+  pinMode(adl_pin_, OUTPUT);
   digitalWrite(start_pin_, LOW);
   digitalWrite(adl_pin_, LOW);
+
+#if USING_ESP32_S2_TIMER_INTERRUPT
+  Serial.println("S2");
+  Serial.println(ESP32_S2_TIMER_INTERRUPT_VERSION);
+#else
+  Serial.println("not S2");
+  Serial.println(ESP32_TIMER_INTERRUPT_VERSION);
+#endif
+
+  if (itimer_.attachInterruptInterval(TIMER_INTERVAL_MS * 1000, SplitFlapDisplay::TimerHandler))
+  {
+    Serial.print(F("Starting  ITimer OK, millis() = ")); Serial.println(millis());
+  }
+  else {
+    Serial.println(F("Can't set ITimer0. Select another freq. or timer"));  
+  }
 }
 
 int8_t SplitFlapDisplay::EncoderToPos(uint8_t encoder_value) {
@@ -123,6 +142,25 @@ int8_t SplitFlapDisplay::EncoderToPos(uint8_t encoder_value) {
   }
 }
 
+uint8_t SplitFlapDisplay::PosToEncoder(uint8_t flap_index) {
+  switch (display_type_) {
+    case k40Flaps:
+      if (flap_index >= 40) {
+        return 0;
+      }
+    case k62Flaps:
+      if (flap_index >= 62) {
+        return 0;
+      }
+  }
+  for (uint8_t encoder = 1; encoder < 64; encoder++) {
+    if (EncoderToPos(encoder) == flap_index) {
+      return encoder;
+    }
+  }
+  return 0;
+}
+
 void SplitFlapDisplay::gotoFlap(uint8_t flap_index) {
 
   if (isCounting()) {
@@ -131,16 +169,20 @@ void SplitFlapDisplay::gotoFlap(uint8_t flap_index) {
   }
 
   uint8_t current_encoder = displays_[display_index_].current_encoder;
+  int8_t current_pos = EncoderToPos(current_encoder); 
+  uint8_t target_encoder = PosToEncoder(flap_index);
 
-  Serial.print("GOTO ");
+  Serial.println("");
+  Serial.print("GOTO position ");
   Serial.println(flap_index);
-
   Serial.print("Current pos: ");
+  Serial.println(current_pos);
+  Serial.print("Current encoder: ");
   Serial.println(current_encoder);
-  Serial.print("Target pos: ");
-  Serial.println(flap_index);
+  Serial.print("Target encoder: ");
+  Serial.println(target_encoder);
 
-  if (current_pos_ == flap_index) {
+  if (current_encoder == target_encoder) {
     Serial.println("nothing to do");
     return;  
   }
@@ -148,7 +190,6 @@ void SplitFlapDisplay::gotoFlap(uint8_t flap_index) {
   int steps = 0;
 
   if (current_encoder) {
-    int8_t current_pos = EncoderToPos(current_encoder);
     if (current_pos >= 0) {
       steps = flap_index - current_pos;
       if (steps < 0) {
@@ -166,12 +207,9 @@ void SplitFlapDisplay::gotoFlap(uint8_t flap_index) {
   Serial.print("Delay: ");
   Serial.println(del);
 
-  Serial.print("Set timer ");
-  Serial.println(del);
-
-  displays_[display_index_].target_encoder = flap_index;
-  displays_[display_index_].must_be_started = true;
+  displays_[display_index_].target_encoder = target_encoder;
   displays_[display_index_].target_millis = millis() + del;
+  displays_[display_index_].must_be_started = true;  
 }
 
 void SplitFlapDisplay::EnableModule(uint8_t adc_pin) {
@@ -200,3 +238,47 @@ void SplitFlapDisplay::MotorStop(uint8_t adc_pin) {
   DisableModule(adc_pin);
 }
 
+#if USING_ESP32_S2_TIMER_INTERRUPT
+  void IRAM_ATTR SplitFlapDisplay::TimerHandler(void * timerNo)
+#else
+  void IRAM_ATTR SplitFlapDisplay::TimerHandler(void)
+#endif
+{
+#if USING_ESP32_S2_TIMER_INTERRUPT
+/////////////////////////////////////////////////////////
+// Always call this for ESP32-S2 before processing ISR
+TIMER_ISR_START(timerNo);
+/////////////////////////////////////////////////////////
+#endif
+  unsigned long now = millis();
+  for (size_t i = 0; i < display_count_; i++) {
+    if (displays_[i].must_be_started) {
+      displays_[i].must_be_started = false;
+      MotorStart(displays_[i].adc_pin);
+      displays_[i].is_counting = true;
+      continue;
+    }
+    if (displays_[i].is_counting && displays_[i].target_millis < now) {
+      MotorStop(displays_[i].adc_pin);
+      uint8_t current_encoder = read(displays_[i].adc_pin);
+      if (current_encoder) {
+        displays_[i].current_encoder = current_encoder;
+      }
+      if (current_encoder == displays_[i].target_encoder) {
+        displays_[i].is_counting = false;
+        Serial.print("Target encoder reached: ");
+        Serial.println(displays_[i].target_encoder);
+      }
+      else {
+        displays_[i].target_millis += 20;
+        MotorStart(displays_[i].adc_pin);
+      }
+    }
+  }
+#if USING_ESP32_S2_TIMER_INTERRUPT
+  /////////////////////////////////////////////////////////
+  // Always call this for ESP32-S2 after processing ISR
+  TIMER_ISR_END(timerNo);
+  /////////////////////////////////////////////////////////
+#endif  
+}

@@ -1,6 +1,4 @@
-#include <Arduino.h>
 #include "splitflapdisplay.h"
-#include <StensTimer.h>
 
 const uint8_t PIN_START = 19;
 const uint8_t PIN_ADL = 18;
@@ -24,7 +22,7 @@ void setup() {
   delay(5000);
 }
 
-int i = 1;
+int i = 0;
 
 void loop() {
   if (hours->isCounting()) {
