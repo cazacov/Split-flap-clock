@@ -56,8 +56,9 @@ void FlapDisplay::gotoFlap(uint8_t flap_index) {
   Serial.println(steps);
 
   long del = 20;
+  uint8_t flaps_count = (display_type_ == k40Flaps) ? 40 : 62;
   if (steps > 0) {
-    del = 4000L * steps / 30 - 20;
+    del = 160000L * steps / (30 * flaps_count) - 20;
   }
   Serial.print("Delay: ");
   Serial.println(del);
@@ -69,50 +70,26 @@ void FlapDisplay::gotoFlap(uint8_t flap_index) {
 
 int8_t FlapDisplay::EncoderToPos(uint8_t encoder_value) {
   
+  if (!encoder_value) {
+    return -1;
+  }
+
   switch (display_type_) {
+    if (encoder_value == 0) {
+      return -1;
+    }
     case k40Flaps:
-      if (encoder_value == 0) {
-        return -1;
+      if (encoder_value > 40) {
+        return -2;
       }
-      if (encoder_value <= 24) {
-        return encoder_value - 1;
+      return encoder_value - 1;
+      break;
+    case k62Flaps:
+      if (encoder_value > 62) {
+        return -2;
       }
-      switch (encoder_value) {
-        case 0x19:
-          return 24;
-        case 0x1A:
-          return 25;
-        case 0x27:
-          return 26;
-        case 0x2D:
-          return 27;
-        case 0x31:
-          return 28;
-        case 0x32:
-          return 29;
-        case 0x33:
-          return 30;
-        case 0x34:
-          return 31;
-        case 0x35:
-          return 32;
-        case 0x36:
-          return 33;
-        case 0x37:
-          return 34;
-        case 0x38:
-          return 35;
-        case 0x39:
-          return 36;
-        case 0x30:
-          return 37;
-        case 0x2E:
-          return 38;
-        case 0x20:
-          return 39;
-        default:
-          return -2;          
-      }
+      return encoder_value - 1;
+      break;
     default:
       return -3;
   }

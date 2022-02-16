@@ -12,30 +12,32 @@ const uint8_t PIN_DATA3 = 26;
 const uint8_t PIN_DATA4 = 27;
 const uint8_t PIN_DATA5 = 14;
 
-FlapDisplay* hours;
-FlapDisplay* minutes;
+FlapDisplay* hours_display;
+FlapDisplay* minutes_display;
 
 void setup() {
   Serial.begin(115200);
   FlapDisplayBoard.init(PIN_START, PIN_ADL,PIN_DATA0,PIN_DATA1,PIN_DATA2,PIN_DATA3,PIN_DATA4,PIN_DATA5);
-  hours = FlapDisplayBoard.CreateDisplay(k40Flaps, PIN_HOURS_ADC);
-//  minutes = SplitFlapDisplay::CreateDisplay(k40Flaps, PIN_HOURS_ADC);
+  hours_display = FlapDisplayBoard.CreateDisplay(k40Flaps, PIN_HOURS_ADC);
+  minutes_display = FlapDisplayBoard.CreateDisplay(k62Flaps, PIN_MINUTES_ADC);
   delay(5000);
 }
 
-int i = 0;
+int hours = 0;
+int minutes = 0;
+int i;
 
 void loop() {
-  if (hours->isCounting()) {
-    Serial.println("Waiting for hours counter");
-    while (hours->isCounting()) {
-      delay(200);
-    }
+  if (!hours_display->isCounting()) {
+    hours_display->gotoFlap(hours);
   }
-  delay(3000);
-  hours->gotoFlap(i);
-  i++;
-  if (i == 25) {
-    i = 1;    
+  if (!minutes_display->isCounting()) {
+    minutes_display->gotoFlap(minutes);
+  }
+  delay(300);
+  
+  if (++i % 10 == 0) {
+    hours = (hours + 1) % 24;
+    minutes = (minutes + 1) % 60;
   }
 }
