@@ -5,13 +5,14 @@
 
 enum DisplayType
 {
-  k40Flaps,
-  k62Flaps
+  k40Flaps = 40,
+  k61Flaps = 61
 };
 
 class FlapDisplay {
 public:
   void gotoFlap(uint8_t flap_index);
+  void continuousRun(unsigned long milliseconds = 1000);
   bool isCounting() { return descriptor_->is_counting || descriptor_->must_be_started;};
 private:
   friend class FlapDisplayBoardHardware;

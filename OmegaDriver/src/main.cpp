@@ -19,8 +19,15 @@ void setup() {
   Serial.begin(115200);
   FlapDisplayBoard.init(PIN_START, PIN_ADL,PIN_DATA0,PIN_DATA1,PIN_DATA2,PIN_DATA3,PIN_DATA4,PIN_DATA5);
   hours_display = FlapDisplayBoard.CreateDisplay(k40Flaps, PIN_HOURS_ADC);
-  minutes_display = FlapDisplayBoard.CreateDisplay(k62Flaps, PIN_MINUTES_ADC);
+  minutes_display = FlapDisplayBoard.CreateDisplay(k61Flaps, PIN_MINUTES_ADC);
   delay(5000);
+
+  Serial.println("Goto 0");
+  hours_display->gotoFlap(0);
+  minutes_display->gotoFlap(0);
+  delay(6000);  
+/*  Serial.println("Run");
+  minutes_display->continuousRun( 20L * 452 * 1000 / 81); */
 }
 
 int hours = 0;
@@ -34,7 +41,7 @@ void loop() {
   if (!minutes_display->isCounting()) {
     minutes_display->gotoFlap(minutes);
   }
-  delay(300);
+  delay(700);
   
   if (++i % 10 == 0) {
     hours = (hours + 1) % 24;

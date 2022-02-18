@@ -16,6 +16,12 @@ FlapDisplay::FlapDisplay(DisplayType display_type, uint8_t adc_pin, DisplayDescr
   descriptor->current_encoder = 0;
 }
 
+void FlapDisplay::continuousRun(unsigned long milliseconds) {
+  descriptor_->target_encoder = 0;
+  descriptor_->target_millis = millis() + milliseconds;
+  descriptor_->must_be_started = true;  
+}
+
 void FlapDisplay::gotoFlap(uint8_t flap_index) {
 
   if (isCounting()) {
@@ -44,11 +50,13 @@ void FlapDisplay::gotoFlap(uint8_t flap_index) {
 
   int steps = 0;
 
+  uint8_t flaps_count = (display_type_ == k40Flaps) ? 40 : 61;
+
   if (current_encoder) {
     if (current_pos >= 0) {
       steps = flap_index - current_pos;
       if (steps < 0) {
-        steps += 40;
+        steps += flaps_count;
       }
     }
   }
@@ -56,9 +64,9 @@ void FlapDisplay::gotoFlap(uint8_t flap_index) {
   Serial.println(steps);
 
   long del = 20;
-  uint8_t flaps_count = (display_type_ == k40Flaps) ? 40 : 62;
+  
   if (steps > 0) {
-    del = 160000L * steps / (30 * flaps_count) - 20;
+    del = 452L * 1000 * steps / (81 * flaps_count);
   }
   Serial.print("Delay: ");
   Serial.println(del);
@@ -84,8 +92,8 @@ int8_t FlapDisplay::EncoderToPos(uint8_t encoder_value) {
       }
       return encoder_value - 1;
       break;
-    case k62Flaps:
-      if (encoder_value > 62) {
+    case k61Flaps:
+      if (encoder_value > 61) {
         return -2;
       }
       return encoder_value - 1;
@@ -101,8 +109,8 @@ uint8_t FlapDisplay::PosToEncoder(uint8_t flap_index) {
       if (flap_index >= 40) {
         return 0;
       }
-    case k62Flaps:
-      if (flap_index >= 62) {
+    case k61Flaps:
+      if (flap_index >= 61) {
         return 0;
       }
   }
