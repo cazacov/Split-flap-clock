@@ -34,7 +34,7 @@ void FlapDisplay::gotoFlap(uint8_t flap_index) {
   uint8_t target_encoder = PosToEncoder(flap_index);
 
   Serial.println("");
-  Serial.print("GOTO position ");
+  Serial.print("GOTO ");
   Serial.println(flap_index);
   Serial.print("Current pos: ");
   Serial.println(current_pos);
@@ -48,9 +48,9 @@ void FlapDisplay::gotoFlap(uint8_t flap_index) {
     return;  
   }
 
-  int steps = 0;
+  int8_t steps = 0;
 
-  uint8_t flaps_count = (display_type_ == k40Flaps) ? 40 : 61;
+  uint8_t flaps_count = (display_type_ == k40Flaps) ? 40 : 62;
 
   if (current_encoder) {
     if (current_pos >= 0) {
@@ -66,7 +66,7 @@ void FlapDisplay::gotoFlap(uint8_t flap_index) {
   long del = 20;
   
   if (steps > 0) {
-    del = 452L * 1000 * steps / (81 * flaps_count);
+    del = 452L * 1000 * steps / (81 * flaps_count) - 40;
   }
   Serial.print("Delay: ");
   Serial.println(del);
@@ -92,8 +92,8 @@ int8_t FlapDisplay::EncoderToPos(uint8_t encoder_value) {
       }
       return encoder_value - 1;
       break;
-    case k61Flaps:
-      if (encoder_value > 61) {
+    case k62Flaps:
+      if (encoder_value > 62) {
         return -2;
       }
       return encoder_value - 1;
@@ -109,8 +109,8 @@ uint8_t FlapDisplay::PosToEncoder(uint8_t flap_index) {
       if (flap_index >= 40) {
         return 0;
       }
-    case k61Flaps:
-      if (flap_index >= 61) {
+    case k62Flaps:
+      if (flap_index >= 62) {
         return 0;
       }
   }

@@ -6,7 +6,7 @@
 enum DisplayType
 {
   k40Flaps = 40,
-  k61Flaps = 61
+  k62Flaps = 62
 };
 
 class FlapDisplay {

@@ -12,8 +12,12 @@ uint8_t FlapDisplayBoardHardware::data2_pin_ = 0;
 uint8_t FlapDisplayBoardHardware::data3_pin_ = 0;
 uint8_t FlapDisplayBoardHardware::data4_pin_ = 0;
 uint8_t FlapDisplayBoardHardware::data5_pin_ = 0;
+#ifdef FLAPDISPLAY_DEBUG
+std::vector<LogEntry> FlapDisplayBoardHardware::log;
+#endif
 
-uint8_t FlapDisplayBoardHardware::ReadEncoder() {
+uint8_t FlapDisplayBoardHardware::ReadEncoder(uint8_t adc_pin) {
+  EnableModule(adc_pin);
   uint8_t input = 0;
   input += (digitalRead(data0_pin_) == LOW) ? 1 << 0 : 0;
   input += (digitalRead(data1_pin_) == LOW) ? 1 << 1 : 0;
@@ -21,12 +25,6 @@ uint8_t FlapDisplayBoardHardware::ReadEncoder() {
   input += (digitalRead(data3_pin_) == LOW) ? 1 << 3 : 0;
   input += (digitalRead(data4_pin_) == LOW) ? 1 << 4 : 0;
   input += (digitalRead(data5_pin_) == LOW) ? 1 << 5 : 0;
-  return input;
-}
-
-uint8_t FlapDisplayBoardHardware::read(uint8_t adc_pin) {
-  EnableModule(adc_pin);
-  uint8_t input = ReadEncoder();
   DisableModule(adc_pin);
   return input;
 }
@@ -74,7 +72,7 @@ void FlapDisplayBoardHardware::init(uint8_t start_pin, uint8_t adl_pin, uint8_t 
 void FlapDisplayBoardHardware::EnableModule(uint8_t adc_pin) {
   digitalWrite(adl_pin_, HIGH);
   digitalWrite(adc_pin, HIGH);
-  delayMicroseconds(35);
+//  delayMicroseconds(READ_DELAY_MICROS);
 }
 
 void FlapDisplayBoardHardware::DisableModule(uint8_t adc_pin) {
@@ -85,15 +83,15 @@ void FlapDisplayBoardHardware::DisableModule(uint8_t adc_pin) {
 void FlapDisplayBoardHardware::MotorStart(uint8_t adc_pin) {
   EnableModule(adc_pin);
   digitalWrite(start_pin_, HIGH);
-  delayMicroseconds(35);
+  delayMicroseconds(READ_DELAY_MICROS);
   DisableModule(adc_pin);
-  delayMicroseconds(35);
+  delayMicroseconds(READ_DELAY_MICROS);
   digitalWrite(start_pin_, LOW);
 }
 
 void FlapDisplayBoardHardware::MotorStop(uint8_t adc_pin) {
   EnableModule(adc_pin);
-  delayMicroseconds(35);
+  delayMicroseconds(READ_DELAY_MICROS);
   DisableModule(adc_pin);
 }
 
@@ -115,11 +113,20 @@ TIMER_ISR_START(timerNo);
       displays_[i].must_be_started = false;
       MotorStart(displays_[i].adc_pin);
       displays_[i].is_counting = true;
+#ifdef FLAPDISPLAY_DEBUG        
+      log.clear();
+#endif      
       continue;
     }
     if (displays_[i].is_counting && displays_[i].target_millis < now) {
       MotorStop(displays_[i].adc_pin);
-      uint8_t current_encoder = read(displays_[i].adc_pin);
+      uint8_t current_encoder = ReadEncoder(displays_[i].adc_pin);
+#ifdef FLAPDISPLAY_DEBUG        
+      LogEntry entry;
+      entry.millis = now;
+      entry.encoder = current_encoder;
+      log.push_back(entry);
+#endif      
       if (current_encoder) {
         displays_[i].current_encoder = current_encoder;
       }
@@ -147,6 +154,19 @@ FlapDisplay* FlapDisplayBoardHardware::CreateDisplay(DisplayType display_type, u
   display_count_++;
   MotorStop(adc_pin);
   return result;
+}
+
+void FlapDisplayBoardHardware::PrintLog() {
+#ifdef FLAPDISPLAY_DEBUG    
+  for (size_t i = 0; i < log.size(); i++) {
+    Serial.print(log[i].millis);
+    Serial.print("\t");
+    Serial.println(log[i].encoder);
+    if (i == 20) {
+      break;
+    }
+  }
+#endif  
 }
 
 FlapDisplayBoardHardware FlapDisplayBoard;

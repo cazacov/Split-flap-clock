@@ -8,3 +8,8 @@ struct DisplayDescriptor {
   volatile uint8_t target_encoder;
   volatile uint8_t current_encoder;
 };
+
+struct LogEntry {
+  long millis;
+  uint8_t encoder;
+};
